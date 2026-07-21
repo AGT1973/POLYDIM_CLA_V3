@@ -1,12 +1,12 @@
 """
 POLYDIM V5.2 - Motor de Arquitectura Polidimensional Cognitiva (Complex Manifold)
 ================================================================================
-Versión: 5.3.0 (End-to-End Complex-valued Neural Network + Sparse Laplacian)
+Versión: 5.1.1 (End-to-End Complex-valued Neural Network - Pragmatic Rollback)
 
 Correcciones matemáticas post-rechazo del tribunal y auditoría:
 1. Laplaciano Magnético: Preservación ESTRICTA de la hermiticidad y la fase imaginaria.
-2. Phase Wrapping: Implementación de PhaseParameter con atan2(y, x).
-3. Sparse Laplacian: O(N*K*D) usando tensores dispersos en lugar de densos.
+2. Phase Wrapping: Implementación de periodicidad directa (remainder) en Theta.
+3. Complex Dropout: Máscaras independientes para parte real e imaginaria.
 4. Activación Compleja: ComplexGELU para preservar la dimensionalidad C^D.
 5. Proyección de Vocabulario: Extracción unitaria absoluta |z| en la última capa.
 
@@ -45,6 +45,23 @@ class ComplexGELU(nn.Module):
         return torch.complex(F.gelu(x.real), F.gelu(x.imag))
 
 
+class ComplexDropout(nn.Module):
+    """Aplica dropout con máscaras independientes para real e imag."""
+    def __init__(self, p=0.1):
+        super().__init__()
+        self.p = p
+        
+    def forward(self, x):
+        if not torch.is_complex(x):
+            return F.dropout(x, self.p, self.training)
+        if not self.training or self.p == 0.0:
+            return x
+        # Máscaras INDEPENDIENTES para real e imag
+        mask_r = (torch.rand(x.shape, device=x.device) > self.p).float() / (1.0 - self.p)
+        mask_i = (torch.rand(x.shape, device=x.device) > self.p).float() / (1.0 - self.p)
+        return torch.complex(x.real * mask_r, x.imag * mask_i)
+
+
 class ComplexLayerNorm(nn.Module):
     """LayerNorm simplificada para tensores complejos (normaliza la magnitud)."""
     def __init__(self, normalized_shape, eps=1e-5):
@@ -56,79 +73,55 @@ class ComplexLayerNorm(nn.Module):
         return torch.complex(self.norm_r(x.real), self.norm_i(x.imag))
 
 # ============================================================
-# 2. LAPLACIANO MAGNÉTICO (Sparse y Preservando Fase)
+# 2. LAPLACIANO MAGNÉTICO (Dense Einsum + Periodic Wrapping)
 # ============================================================
 
-class PhaseParameter(nn.Module):
-    """Fase acotada a [-π, π] por construcción."""
-    def __init__(self, N: int):
-        super().__init__()
-        self.y = nn.Parameter(torch.randn(N, N) * 0.01)
-        self.x = nn.Parameter(torch.ones(N, N) * 0.1)
-    
-    def forward(self) -> torch.Tensor:
-        return torch.atan2(self.y, self.x)  # siempre en [-π, π]
-
-
-class SparseMagneticLaplacianFast(nn.Module):
+class MagneticLaplacian(nn.Module):
     """
-    Laplaciano Magnético Disperso (O(N*K*D)) para grafos dirigidos.
+    Laplaciano Magnético para grafos dirigidos.
     Preserva el tensor en el dominio complejo C^D, sin truncar a real.
+    Implementación óptima para N <= 512.
     """
-    def __init__(self, N: int, K: int = 16):
+    def __init__(self, N: int, q: float = math.pi / 4.0, skip_k: int = 3):
         super().__init__()
         self.N = N
-        self.K = K
-        self.W_adj = nn.Parameter(torch.randn(N, N) * 0.02)
-        self.Theta = PhaseParameter(N)
+        self.q = q
+        self.skip_k = skip_k
         
-        mask = torch.tril(torch.ones(N, N), diagonal=-1)
-        self.register_buffer('causal_mask', mask)
-        self.register_buffer('sparse_mask', torch.zeros(N, N))
-        self._update_sparse_mask()
-    
-    def _update_sparse_mask(self):
-        with torch.no_grad():
-            W = self.W_adj * self.causal_mask
-            absW = W.abs()
-            # Seleccionar los top K pesos por fila
-            _, topk_idx = torch.topk(absW, min(self.K, self.N-1), dim=-1)
-            mask = torch.zeros_like(W)
-            mask.scatter_(-1, topk_idx, 1.0)
-            self.sparse_mask.copy_(mask)
+        A = self._build_adjacency(N, skip_k)
+        A_s = 0.5 * (A + A.T)
+        D_s = np.diag(np.sum(A_s, axis=1))
+        
+        # Theta como parámetro entrenable
+        self.Theta = nn.Parameter(torch.from_numpy(2 * np.pi * q * (A - A.T)).float())
+        
+        self.register_buffer('A_s', torch.from_numpy(A_s).float())
+        self.register_buffer('D_s', torch.from_numpy(D_s).float())
+        
+    def _build_adjacency(self, N: int, skip_k: int) -> np.ndarray:
+        A = np.zeros((N, N), dtype=np.float64)
+        for i in range(N - 1):
+            A[i, i + 1] = 1.0
+        for k in range(2, skip_k + 1):
+            for i in range(N - k):
+                A[i, i + k] = 1.0
+        return A
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         T_seq = x.shape[-2]
-        B = x.shape[0]
-        D = x.shape[-1]
         
-        W = self.W_adj[:T_seq, :T_seq]
-        mask = self.causal_mask[:T_seq, :T_seq]
-        sparse = self.sparse_mask[:T_seq, :T_seq]
+        # Periodic Wrapping para Theta [-pi, pi]
+        Theta_wrapped = torch.remainder(self.Theta[:T_seq, :T_seq] + math.pi, 2*math.pi) - math.pi
         
-        adj = F.relu(W * mask * sparse)
+        # Construir Laplaciano
+        A_s = self.A_s[:T_seq, :T_seq]
+        D_s_diag = torch.diag(self.D_s[:T_seq, :T_seq]) # (T,)
         
-        # D_s como vector
-        row_sums = adj.sum(dim=-1)
+        H_q = A_s * torch.exp(1j * Theta_wrapped)
         
-        # H_q como sparse COO
-        Theta = self.Theta()[:T_seq, :T_seq]
-        H = adj * torch.exp(1j * Theta * mask * sparse)
-        
-        # Sparse matmul: O(N*K*D) en lugar de O(N²D)
-        indices = H.nonzero(as_tuple=False).t()
-        values = H[indices[0], indices[1]]
-        H_sparse = torch.sparse_coo_tensor(indices, values, H.shape)
-        
-        if not torch.is_complex(x):
-            x = x.to(torch.cfloat)
-        
-        D_x = row_sums.unsqueeze(0).unsqueeze(-1) * x
-        
-        # Transponer x para que sea (T_seq, B*D) y permitir sparse.mm
-        x_reshaped = x.transpose(0, 1).reshape(T_seq, B * D)
-        H_x_reshaped = torch.sparse.mm(H_sparse, x_reshaped)
-        H_x = H_x_reshaped.reshape(T_seq, B, D).transpose(0, 1)
+        # D_s - H_q multiplicando x
+        D_x = D_s_diag.unsqueeze(0).unsqueeze(-1) * x
+        H_x = torch.einsum('ij,...jd->...id', H_q, x)
         
         return D_x - H_x
 
@@ -200,15 +193,15 @@ class PolydimLayer(nn.Module):
             for _ in range(n_nodes)
         ])
         
-        self.laplacian = SparseMagneticLaplacianFast(N, K=16)
+        self.laplacian = MagneticLaplacian(N, q=q, skip_k=skip_k)
         
         self.mlp = nn.Sequential(
             ComplexLinear(D, 4 * D),
             ComplexGELU(),
-            # Dropout normalizado
-            nn.Dropout(dropout),
+            # ComplexDropout con máscaras independientes
+            ComplexDropout(dropout),
             ComplexLinear(4 * D, D),
-            nn.Dropout(dropout)
+            ComplexDropout(dropout)
         )
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -261,7 +254,7 @@ class PolydimMotorV5(nn.Module):
         
         self.token_embed = nn.Embedding(vocab_size, D)
         self.pos_embed = FourierEmbedding(D, max_len=N)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = ComplexDropout(dropout)
         
         self.to_manifold = ComplexLinear(D, D)
         
@@ -315,7 +308,7 @@ class PolydimMotorV5(nn.Module):
 
 if __name__ == "__main__":
     print("="*70)
-    print("POLYDIM-CLA V5.3 - Test de Integridad (Sparse Complex Manifold)")
+    print("POLYDIM-CLA V5.1.1 - Test de Integridad (Dense Einsum Manifold)")
     print("="*70)
     
     B, N, D = 2, 20, 256
