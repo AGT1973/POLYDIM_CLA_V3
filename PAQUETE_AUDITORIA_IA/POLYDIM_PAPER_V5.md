@@ -1,5 +1,5 @@
 ---
-title: "The POLYDIM Architecture V5.2: End-to-End Complex Manifolds and Magnetic Graph Topologies for Native AI Data Transmission"
+title: "Staying in high dimension is all you need: End-to-End Complex Manifolds and Magnetic Graph Topologies for Native AI Data Transmission"
 author: 
   - "Ariel (Main Architect)"
   - "Antigravity (Orchestrator Agent)"
