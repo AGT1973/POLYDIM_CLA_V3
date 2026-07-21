@@ -1,14 +1,12 @@
 """
 POLYDIM V5.2 - Motor de Arquitectura Polidimensional Cognitiva (Complex Manifold)
 ================================================================================
-Versión: 5.1.1 (End-to-End Complex-valued Neural Network - Pragmatic Rollback)
+Versión: 5.1 (End-to-End Complex-valued Neural Network - Pure Base)
 
 Correcciones matemáticas post-rechazo del tribunal y auditoría:
 1. Laplaciano Magnético: Preservación ESTRICTA de la hermiticidad y la fase imaginaria.
-2. Phase Wrapping: Implementación de periodicidad directa (remainder) en Theta.
-3. Complex Dropout: Máscaras independientes para parte real e imaginaria.
-4. Activación Compleja: ComplexGELU para preservar la dimensionalidad C^D.
-5. Proyección de Vocabulario: Extracción unitaria absoluta |z| en la última capa.
+2. Activación Compleja: ComplexGELU para preservar la dimensionalidad C^D.
+3. Proyección de Vocabulario: Extracción unitaria absoluta |z| en la última capa.
 
 Referencias:
 - Trabelsi, C., et al. (2018). Deep Complex Networks. ICLR.
@@ -43,23 +41,6 @@ class ComplexGELU(nn.Module):
     """GELU aplicada independientemente a la parte real e imaginaria."""
     def forward(self, x):
         return torch.complex(F.gelu(x.real), F.gelu(x.imag))
-
-
-class ComplexDropout(nn.Module):
-    """Aplica dropout con máscaras independientes para real e imag."""
-    def __init__(self, p=0.1):
-        super().__init__()
-        self.p = p
-        
-    def forward(self, x):
-        if not torch.is_complex(x):
-            return F.dropout(x, self.p, self.training)
-        if not self.training or self.p == 0.0:
-            return x
-        # Máscaras INDEPENDIENTES para real e imag
-        mask_r = (torch.rand(x.shape, device=x.device) > self.p).float() / (1.0 - self.p)
-        mask_i = (torch.rand(x.shape, device=x.device) > self.p).float() / (1.0 - self.p)
-        return torch.complex(x.real * mask_r, x.imag * mask_i)
 
 
 class ComplexLayerNorm(nn.Module):
@@ -109,15 +90,11 @@ class MagneticLaplacian(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         T_seq = x.shape[-2]
-        
-        # Periodic Wrapping para Theta [-pi, pi]
-        Theta_wrapped = torch.remainder(self.Theta[:T_seq, :T_seq] + math.pi, 2*math.pi) - math.pi
-        
         # Construir Laplaciano
         A_s = self.A_s[:T_seq, :T_seq]
         D_s_diag = torch.diag(self.D_s[:T_seq, :T_seq]) # (T,)
         
-        H_q = A_s * torch.exp(1j * Theta_wrapped)
+        H_q = A_s * torch.exp(1j * self.Theta[:T_seq, :T_seq])
         
         # D_s - H_q multiplicando x
         D_x = D_s_diag.unsqueeze(0).unsqueeze(-1) * x
@@ -198,10 +175,10 @@ class PolydimLayer(nn.Module):
         self.mlp = nn.Sequential(
             ComplexLinear(D, 4 * D),
             ComplexGELU(),
-            # ComplexDropout con máscaras independientes
-            ComplexDropout(dropout),
+            # nn.Dropout estándar
+            nn.Dropout(dropout),
             ComplexLinear(4 * D, D),
-            ComplexDropout(dropout)
+            nn.Dropout(dropout)
         )
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -254,7 +231,7 @@ class PolydimMotorV5(nn.Module):
         
         self.token_embed = nn.Embedding(vocab_size, D)
         self.pos_embed = FourierEmbedding(D, max_len=N)
-        self.dropout = ComplexDropout(dropout)
+        self.dropout = nn.Dropout(dropout)
         
         self.to_manifold = ComplexLinear(D, D)
         
@@ -308,7 +285,7 @@ class PolydimMotorV5(nn.Module):
 
 if __name__ == "__main__":
     print("="*70)
-    print("POLYDIM-CLA V5.1.1 - Test de Integridad (Dense Einsum Manifold)")
+    print("POLYDIM-CLA V5.1 - Test de Integridad (Pure Dense Einsum Manifold)")
     print("="*70)
     
     B, N, D = 2, 20, 256
