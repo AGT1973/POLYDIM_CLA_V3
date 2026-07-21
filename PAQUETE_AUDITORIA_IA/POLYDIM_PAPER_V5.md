@@ -5,7 +5,7 @@ author:
   - "Antigravity (Orchestrator Agent)"
 date: "July 2026"
 abstract: |
-  Current AI infrastructure suffers from massive entropy loss during inter-agent communication, primarily due to the Data Processing Inequality (DPI) enforced by 1D serialization formats (JSON, APIs). The POLYDIM architecture proposes a paradigm shift: maintaining native high-dimensional (ND) manifolds throughout the multi-agent pipeline. This paper introduces the Polydim Motor V5.2 and the Polydim Message Transfer Protocol (PMTP), an O(D log D) isometric routing protocol utilizing purely Fourier-based phase rotation. 
+  Current AI infrastructure suffers from massive entropy loss during inter-agent communication, primarily due to the Data Processing Inequality (DPI) enforced by 1D serialization formats (JSON, APIs). The POLYDIM-CLA architecture proposes a paradigm shift: maintaining native high-dimensional (ND) manifolds throughout the multi-agent pipeline. This paper introduces the POLYDIM-CLA Motor V5.2 and the POLYDIM-CLA Message Transfer Protocol (PMTP), an O(D log D) isometric routing protocol utilizing purely Fourier-based phase rotation. 
   
   Furthermore, we address the limitations of $O(N^2)$ Self-Attention models by processing token sequences as directed graphs using the Magnetic Laplacian. Defying arbitrary critiques regarding spectral stability, we demonstrate mathematically that the Magnetic Laplacian is strictly Hermitian, ensuring real eigenvalues and structural causality in $O(N)$ operations. Finally, we implement an End-to-End Complex-Valued Neural Network (CVNN) to prevent the collapse of imaginary phase information (directional flow), setting a new standard for hyper-geometric topological processing in LLMs.
 ---
@@ -16,9 +16,9 @@ The contemporary paradigm of Artificial Intelligence infrastructure is built upo
 
 According to the Data Processing Inequality (DPI) from Information Theory, any deterministic mapping $X \to Y \to Z$ guarantees that $I(X; Z) \le I(X; Y)$. By continuously collapsing $S^{D-1}$ hyper-spherical geometries into 1D token strings, current multi-agent systems destroy geometric relationships, gradients, and contextual superposition. 
 
-POLYDIM (Polymorphic Dimensionality) is a theoretical and empirical framework designed to eradicate this "1D wormhole". Our core thesis is that AI models (LatentMAS) must communicate natively using tensors, restricting 2D/textual collapse solely to the final human-interface boundary.
+POLYDIM-CLA (Polymorphic Dimensionality) is a theoretical and empirical framework designed to eradicate this "1D wormhole". Our core thesis is that AI models (LatentMAS) must communicate natively using tensors, restricting 2D/textual collapse solely to the final human-interface boundary.
 
-# 2. The Polydim Message Transfer Protocol (PMTP V5.2)
+# 2. The POLYDIM-CLA Message Transfer Protocol (PMTP V5.2)
 
 To achieve true hardware-agnostic isometry, PMTP V5.2 utilizes a purely complex Fourier pipeline:
 $$ E(x) = \mathcal{F}^{-1}\left( \mathcal{F}(x) \odot e^{i \cdot \Phi} \right) $$
@@ -27,7 +27,7 @@ Since the Fast Fourier Transform (FFT) and its inverse are symmetric and heavily
 
 # 3. Directed Graph Signal Processing: The Magnetic Laplacian
 
-To process these native tensors, the Polydim Motor utilizes Graph Signal Processing (GSP). To model sequential causal relationships (e.g., autoregressive generation), we must use directed graphs.
+To process these native tensors, the POLYDIM-CLA Motor utilizes Graph Signal Processing (GSP). To model sequential causal relationships (e.g., autoregressive generation), we must use directed graphs.
 
 ## 3.1 Refuting the Myth of Spectral Instability
 A common, yet mathematically flawed critique argues that the Magnetic Laplacian (ML) is an "arbitrary" quantum physics term that breaks Hermiticity. This demonstrates a severe misunderstanding of Directed Graph Signal Processing (Furutani et al., 2019; Fanuel et al., 2017).
@@ -41,13 +41,13 @@ By construction, $\Theta_{ij} = -\Theta_{ji}$, guaranteeing that $H^{(q)}$ is st
 ## 3.2 Native Causal Flow vs. The $O(N^2)$ Hack
 Standard Transformers enforce causality via "Causal Masking". This is an algorithmic hack that calculates a dense $N \times N$ attention matrix ($O(N^2)$) only to retroactively apply $-\infty$ to the upper triangle. 
 
-In contrast, POLYDIM processes causality as a native geometric property of the space via the Magnetic Laplacian phase. It abandons the 1D sequential pipe in favor of $\mathcal{O}(N)$ sparse topological diffusion. Forcing causal masking onto a graph structure fundamentally misunderstands the mathematical elegance of MagNet architectures (Zhang et al., 2021).
+In contrast, POLYDIM-CLA processes causality as a native geometric property of the space via the Magnetic Laplacian phase. It abandons the 1D sequential pipe in favor of $\mathcal{O}(N)$ sparse topological diffusion. Forcing causal masking onto a graph structure fundamentally misunderstands the mathematical elegance of MagNet architectures (Zhang et al., 2021).
 
 # 4. V5.2: End-to-End Complex Manifold (CVNN)
 
-Early iterations of POLYDIM (V4) projected the output of the Magnetic Laplacian back to real numbers (`y.real`) to maintain compatibility with standard `nn.Linear` layers. This ad-hoc projection destroyed the imaginary phase (the directional flow), crippling the model's performance and resulting in suboptimal Loss metrics compared to standard Transformers.
+Early iterations of POLYDIM-CLA (V4) projected the output of the Magnetic Laplacian back to real numbers (`y.real`) to maintain compatibility with standard `nn.Linear` layers. This ad-hoc projection destroyed the imaginary phase (the directional flow), crippling the model's performance and resulting in suboptimal Loss metrics compared to standard Transformers.
 
-POLYDIM V5.2 implements a full Complex-Valued Neural Network (CVNN) pipeline (Trabelsi et al., 2018):
+POLYDIM-CLA V5.2 implements a full Complex-Valued Neural Network (CVNN) pipeline (Trabelsi et al., 2018):
 1. **ComplexLinear Layers:** Extending standard dense layers to operate fully in $\mathbb{C}^D$.
 2. **ComplexGELU Activations:** Applying non-linearities to both real and imaginary components independently to preserve phase structure.
 3. **Unitary Final Projection:** Extracting the magnitude $|z|$ only strictly prior to the final vocabulary softmax projection.
@@ -55,6 +55,6 @@ POLYDIM V5.2 implements a full Complex-Valued Neural Network (CVNN) pipeline (Tr
 By preserving the complex topological manifold end-to-end, the network maintains the memory flow encoded by the magnetic field, effectively bridging the empirical gap while remaining conceptually pure.
 
 # 5. Conclusion
-The 1D bottleneck is not an immovable law of physics, but a vestige of legacy API infrastructure. POLYDIM proves that native, high-dimensional tensor communication between independent AI nodes is theoretically necessary and computationally feasible. By uniting FFT-based Isometric Routing with End-to-End Complex Graph Signal Processing, POLYDIM redefines the fundamental mechanics of cognitive architectures.
+The 1D bottleneck is not an immovable law of physics, but a vestige of legacy API infrastructure. POLYDIM-CLA proves that native, high-dimensional tensor communication between independent AI nodes is theoretically necessary and computationally feasible. By uniting FFT-based Isometric Routing with End-to-End Complex Graph Signal Processing, POLYDIM-CLA redefines the fundamental mechanics of cognitive architectures.
 
 *This work was synthesized via adversarial co-design between the author and the orchestration agent, enforcing the Bulldog Critic mode for maximal empirical rigor.*
